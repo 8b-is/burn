@@ -11,6 +11,20 @@ import math
 from pathlib import Path
 
 
+def export_model(model, output_path):
+    """Export through a traced function, including Keras 3 models."""
+    signature = [tf.TensorSpec(model.inputs[0].shape, model.inputs[0].dtype, name="input")]
+
+    @tf.function(input_signature=signature)
+    def inference(inputs):
+        return model(inputs, training=False)
+
+    onnx_model, _ = tf2onnx.convert.from_function(
+        inference, input_signature=signature, opset=16)
+    onnx.checker.check_model(onnx_model)
+    onnx.save(onnx_model, output_path)
+
+
 def main():
     # Define paths to model files
     MODELS_DIR = '../src/model/'
@@ -72,9 +86,7 @@ def main():
     history = model.fit(x_train, y_train, epochs=500, batch_size=64,
                         validation_data=(x_validate, y_validate))
 
-    # Use from_function for tf functions
-    onnx_model, _ = tf2onnx.convert.from_keras(model, opset=16)
-    onnx.save(onnx_model, MODEL_ONNX)
+    export_model(model, MODEL_ONNX)
     print("Onnx model generated at", Path(MODEL_ONNX).absolute())
 
 
